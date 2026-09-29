@@ -13,6 +13,22 @@ def client(tmp_path, monkeypatch):
         yield test_client
 
 
+def test_cors_preflight_from_deployed_frontend(client):
+    response = client.options(
+        "/api/todos",
+        headers={
+            "Origin": "https://zedu-todo-list.vercel.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == (
+        "https://zedu-todo-list.vercel.app"
+    )
+
+
 def test_list_when_database_is_empty(client):
     response = client.get("/api/todos")
 
