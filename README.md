@@ -31,10 +31,10 @@ These commands install FastAPI, Uvicorn, Pytest, and HTTPX in the virtual enviro
 ## 4) Run the API
 
 ```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-This starts the local API server. While it is running, you can open the interactive docs page at http://127.0.0.1:8000/docs.
+This starts the API server on all network interfaces so remote port scanners can reach it. While it is running, you can open the interactive docs page at http://127.0.0.1:8000/docs.
 
 ## 5) Run the tests
 
