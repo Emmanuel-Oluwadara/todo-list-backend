@@ -1,4 +1,5 @@
 import pytest
+import sqlite3
 from fastapi.testclient import TestClient
 
 
@@ -44,6 +45,7 @@ def test_create_todo_and_trim_text(client):
         "id": 1,
         "text": "Plan the week",
         "completed": False,
+        "notes": "",
     }
 
 
@@ -66,7 +68,59 @@ def test_update_completion(client):
         "id": todo_id,
         "text": "Read a book",
         "completed": True,
+        "notes": "",
     }
+
+
+def test_edit_todo_updates_text_and_notes(client):
+    created = client.post("/api/todos", json={"text": "Learn python"})
+    todo_id = created.json()["id"]
+
+    response = client.patch(
+        f"/api/todos/{todo_id}",
+        json={"text": "Learn python hghj", "notes": "Review chapter 2", "completed": False},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": todo_id,
+        "text": "Learn python hghj",
+        "completed": False,
+        "notes": "Review chapter 2",
+    }
+    assert client.get("/api/todos").json() == [response.json()]
+
+
+def test_startup_adds_notes_to_existing_database(tmp_path, monkeypatch):
+    db_path = tmp_path / "legacy-todos.db"
+    monkeypatch.setenv("TODO_DATABASE_PATH", str(db_path))
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL CHECK (trim(text) != ''),
+                completed INTEGER NOT NULL CHECK (completed IN (0, 1)) DEFAULT 0
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO todos (text, completed) VALUES (?, 0)",
+            ("Existing todo",),
+        )
+
+    from app.database import ensure_db_ready, get_connection
+
+    ensure_db_ready()
+    connection = get_connection()
+    try:
+        row = connection.execute(
+            "SELECT notes FROM todos WHERE id = 1"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert row["notes"] == ""
 
 
 def test_delete_one_todo_and_missing_id(client):
@@ -105,4 +159,5 @@ def test_persistence_across_separate_api_requests(client):
         "id": 1,
         "text": "Persist me",
         "completed": False,
+        "notes": "",
     }]

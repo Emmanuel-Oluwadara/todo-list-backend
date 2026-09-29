@@ -29,7 +29,7 @@ def list_todos() -> list[TodoResponse]:
     connection = get_connection()
     try:
         rows = connection.execute(
-            "SELECT id, text, completed FROM todos ORDER BY id DESC"
+            "SELECT id, text, completed, notes FROM todos ORDER BY id DESC"
         ).fetchall()
     finally:
         connection.close()
@@ -39,6 +39,7 @@ def list_todos() -> list[TodoResponse]:
             id=row["id"],
             text=row["text"],
             completed=bool(row["completed"]),
+            notes=row["notes"],
         )
         for row in rows
     ]
@@ -49,13 +50,13 @@ def create_todo(todo: TodoCreate) -> TodoResponse:
     connection = get_connection()
     try:
         cursor = connection.execute(
-            "INSERT INTO todos (text, completed) VALUES (?, 0)",
-            (todo.text,),
+            "INSERT INTO todos (text, notes, completed) VALUES (?, ?, 0)",
+            (todo.text, todo.notes),
         )
         connection.commit()
         new_todo_id = cursor.lastrowid
         row = connection.execute(
-            "SELECT id, text, completed FROM todos WHERE id = ?",
+            "SELECT id, text, completed, notes FROM todos WHERE id = ?",
             (new_todo_id,),
         ).fetchone()
         if row is None:
@@ -64,6 +65,7 @@ def create_todo(todo: TodoCreate) -> TodoResponse:
             id=row["id"],
             text=row["text"],
             completed=bool(row["completed"]),
+            notes=row["notes"],
         )
     except HTTPException:
         connection.rollback()
@@ -79,16 +81,24 @@ def create_todo(todo: TodoCreate) -> TodoResponse:
 def update_todo(todo_id: int, payload: TodoUpdate) -> TodoResponse:
     connection = get_connection()
     try:
+        updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if "completed" in updates:
+            updates["completed"] = int(updates["completed"])
+        columns = ("text", "notes", "completed")
+        set_clause = ", ".join(
+            f"{column} = ?" for column in columns if column in updates
+        )
+        values = tuple(updates[column] for column in columns if column in updates)
         cursor = connection.execute(
-            "UPDATE todos SET completed = ? WHERE id = ?",
-            (int(payload.completed), todo_id),
+            f"UPDATE todos SET {set_clause} WHERE id = ?",
+            (*values, todo_id),
         )
         connection.commit()
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Todo not found")
 
         row = connection.execute(
-            "SELECT id, text, completed FROM todos WHERE id = ?",
+            "SELECT id, text, completed, notes FROM todos WHERE id = ?",
             (todo_id,),
         ).fetchone()
         if row is None:
@@ -98,6 +108,7 @@ def update_todo(todo_id: int, payload: TodoUpdate) -> TodoResponse:
             id=row["id"],
             text=row["text"],
             completed=bool(row["completed"]),
+            notes=row["notes"],
         )
     except HTTPException:
         connection.rollback()

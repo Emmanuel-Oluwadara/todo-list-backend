@@ -24,10 +24,18 @@ def ensure_db_ready() -> Path:
             CREATE TABLE IF NOT EXISTS todos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 text TEXT NOT NULL CHECK (trim(text) != ''),
-                completed INTEGER NOT NULL CHECK (completed IN (0, 1)) DEFAULT 0
+                completed INTEGER NOT NULL CHECK (completed IN (0, 1)) DEFAULT 0,
+                notes TEXT NOT NULL DEFAULT ''
             )
             """
         )
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(todos)")
+        }
+        if "notes" not in columns:
+            connection.execute(
+                "ALTER TABLE todos ADD COLUMN notes TEXT NOT NULL DEFAULT ''"
+            )
         connection.commit()
     finally:
         connection.close()
