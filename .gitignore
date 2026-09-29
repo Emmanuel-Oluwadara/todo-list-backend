@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+# Local SQLite database
+# Keep the database folder, but do not commit the generated file.
+data/*.db
